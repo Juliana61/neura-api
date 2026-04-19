@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: neura-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port 10000
+    envVars:
+      DATABASE_URL: postgresql://appneura_db_user:fJDOzcRdvOb5JtlwV9RHy5c821n5LVg2@dpg-d423aku3jp1c73aa2f0g-a.oregon-postgres.render.com/appneura_db
+      PYTHON_VERSION: 3.12
