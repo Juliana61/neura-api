@@ -90,35 +90,37 @@ def register(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
 
 @app.post("/auth/login", response_model=schemas.AuthResponse)
 def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db)):
-    # Validar correo institucional
     if not login_data.correo.endswith("@elpoli.edu.co"):
         return schemas.AuthResponse(
             success=False,
             message="Debe usar correo institucional @elpoli.edu.co"
         )
-    
-    # Buscar usuario (en producción verificar password hash)
+
     db_usuario = crud.get_usuario_by_email(db, login_data.correo)
     if not db_usuario:
         return schemas.AuthResponse(
             success=False,
             message="Usuario no encontrado"
         )
-    
-    # Simular verificación de password (en producción usar hash)
-    if login_data.password != "password123":  # Temporal para pruebas
+
+    if not db_usuario.password:
         return schemas.AuthResponse(
             success=False,
             message="Credenciales incorrectas"
         )
-    
+
+    if not crud.pwd_context.verify(login_data.password, db_usuario.password):
+        return schemas.AuthResponse(
+            success=False,
+            message="Credenciales incorrectas"
+        )
+
     return schemas.AuthResponse(
         success=True,
         message="Login exitoso",
         user=schemas.UsuarioResponse.from_orm(db_usuario),
         token="simulated_token"
     )
-    
 
 
     
