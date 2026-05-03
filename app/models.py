@@ -15,6 +15,7 @@ class Usuario(Base):
     
     id_usuario = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100))
+    password = Column(String(255), nullable=True)
     correo = Column(String(150), unique=True, index=True)
     fecha_registro = Column(DateTime, default=datetime.utcnow)
     foto_perfil = Column(Text, nullable=True)
