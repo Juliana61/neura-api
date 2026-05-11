@@ -1,7 +1,10 @@
 from pydantic import BaseModel, EmailStr
 from datetime import datetime, date
 from typing import List, Optional
-
+ 
+class TokenData(BaseModel):
+    correo: Optional[str] = None
+    id_usuario: Optional[int] = None
 class UsuarioBase(BaseModel):
     nombre: str
     correo: EmailStr

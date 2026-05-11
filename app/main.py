@@ -5,10 +5,12 @@ from app.database import get_db, engine
 import app.models as models
 import app.schemas as schemas
 import app.crud as crud
+import re
 from app.routes import registro
 from app.routes import ia
 from app.routes.test import router as test_router
 from app.routes.estadisticas import router as estadisticas_router
+from app.auth import hashear_password, verificar_password, crear_token
 
 
 # Crear tablas
@@ -28,6 +30,21 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+def validar_password(password: str) -> tuple[bool, str]:
+    if len(password) < 8:
+        return False, "La contraseña debe tener al menos 8 caracteres"
+    if len(password) > 72:
+        return False, "La contraseña no puede tener más de 72 caracteres"
+    if not re.search(r"[A-Z]", password):
+        return False, "Debe contener al menos una letra mayúscula"
+    if not re.search(r"[a-z]", password):
+        return False, "Debe contener al menos una letra minúscula"
+    if not re.search(r"\d", password):
+        return False, "Debe contener al menos un número"
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>_\-\+\=\[\]\\\/]", password):
+        return False, "Debe contener al menos un carácter especial (!@#$%...)"
+    return True, "OK"
 
 @app.get("/")
 def root():
@@ -63,30 +80,49 @@ def get_actividades(db: Session = Depends(get_db)):
 
 @app.post("/auth/register", response_model=schemas.AuthResponse)
 def register(usuario: schemas.UsuarioCreate, db: Session = Depends(get_db)):
-    # Validar correo institucional
     if not usuario.correo.endswith("@elpoli.edu.co"):
         return schemas.AuthResponse(
             success=False,
             message="Debe usar correo institucional @elpoli.edu.co"
         )
-    
-    # Verificar si el usuario ya existe
+
+    if len(usuario.password) > 72:
+        return schemas.AuthResponse(
+            success=False,
+            message="La contraseña no puede tener más de 72 caracteres"
+        )
+
     db_usuario = crud.get_usuario_by_email(db, usuario.correo)
     if db_usuario:
         return schemas.AuthResponse(
             success=False,
             message="El usuario ya está registrado"
         )
-    
-    # Crear usuario
-    nuevo_usuario = crud.crear_usuario(db, usuario)
-    
+
+    # Hashear password con auth.py
+    usuario_data = usuario.dict()
+    usuario_data["password"] = hashear_password(usuario.password)
+
+    db_usuario = models.Usuario(
+        nombre=usuario_data["nombre"],
+        correo=usuario_data["correo"],
+        password=usuario_data["password"],
+        carrera=usuario_data.get("carrera"),
+        semestre=usuario_data.get("semestre")
+    )
+    db.add(db_usuario)
+    db.commit()
+    db.refresh(db_usuario)
+
+    token = crear_token({"sub": db_usuario.correo, "id": db_usuario.id_usuario})
+
     return schemas.AuthResponse(
         success=True,
         message="Usuario registrado exitosamente",
-        user=schemas.UsuarioResponse.from_orm(nuevo_usuario),
-        token="simulated_token"  # En producción usar JWT real
+        user=schemas.UsuarioResponse.from_orm(db_usuario),
+        token=token
     )
+
 
 @app.post("/auth/login", response_model=schemas.AuthResponse)
 def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db)):
@@ -109,19 +145,20 @@ def login(login_data: schemas.LoginRequest, db: Session = Depends(get_db)):
             message="Credenciales incorrectas"
         )
 
-    if not crud.pwd_context.verify(login_data.password, db_usuario.password):
+    if not verificar_password(login_data.password, db_usuario.password):
         return schemas.AuthResponse(
             success=False,
             message="Credenciales incorrectas"
         )
 
+    token = crear_token({"sub": db_usuario.correo, "id": db_usuario.id_usuario})
+
     return schemas.AuthResponse(
         success=True,
         message="Login exitoso",
         user=schemas.UsuarioResponse.from_orm(db_usuario),
-        token="simulated_token"
+        token=token
     )
-
 
     
 app.include_router(registro.router)
