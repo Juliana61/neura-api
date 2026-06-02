@@ -39,7 +39,7 @@ async def responder_ia(req: ChatRequest):
                 headers={
                     "Authorization": f"Bearer {OPENROUTER_API_KEY}",
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "https://neura-api-dm1v.onrender.com",
+                    "HTTP-Referer": "https://neura-api-5s0g.onrender.com",
                     "X-Title": "NeuraApp"
                 },
                 json={
